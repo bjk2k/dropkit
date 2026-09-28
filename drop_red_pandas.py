@@ -392,7 +392,7 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
         report("docker and docker-compose-plugin installed")
 
     sh(["systemctl", "start", "docker"], report, sudo=True)
-    if not wait_for_docker(timeout=30, report=report):
+    if not wait_for_docker(timeout=30, report=report, sudo=True):
         raise RuntimeError("docker daemon did not become ready in time")
 
     sh(["make"], report, sudo=True, cwd=workdir)
