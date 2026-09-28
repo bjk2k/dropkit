@@ -25,6 +25,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+import time
 import tempfile
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -234,6 +235,22 @@ def docker_ready() -> bool:
         return False
 
 
+def wait_for_docker(timeout: float = 30.0, interval: float = 1.0, report=None) -> bool:
+    """Poll until the docker daemon responds, or timeout seconds elapse."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            subprocess.run(
+                ["docker", "info"], check=True, capture_output=True, text=True
+            )
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            if report:
+                report("waiting for docker daemon...")
+            time.sleep(interval)
+    return False
+
+
 # --------------------------------------------------------------------------- #
 # Installers
 # --------------------------------------------------------------------------- #
@@ -343,7 +360,10 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
             raise ValueError(f"No procedure to install docker for distro {distro}")
         report("docker and docker-compose-plugin installed")
 
-    assert docker_ready(), "Docker daemon not ready!"
+    sh(["systemctl", "start", "docker"], report, sudo=True)
+    if not wait_for_docker(timeout=30, report=report):
+        raise RuntimeError("docker daemon did not become ready in time")
+
     sh(["make"], report, sudo=True, cwd=workdir)
     report("done")
 
