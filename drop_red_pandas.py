@@ -40,6 +40,45 @@ from rich.table import Table
 
 console = Console()
 
+BANNER = r"""
+                      █      █           █                   
+                       ██    █  █       █                    
+                       █         ██████  █                   
+                                    █   █                    
+  ██    ███                             █          ██    ██  
+█           ██          █              █       ██            
+         ██    █        █              █     █     █         
+█     █████  █   ██   ███             █    █   █  █████     █
+    █    █████ █   ███████  █        █████   █ █████    █    
+        ██   ██  █ ███████████████████████ █  ██   ██        
+█              █ ███████████████████████████ █      █   █   █
+      █      █ ███████████████████████████████        █      
+██         ██████████████████████████████████████          ██
+█     ███████████████████████████████████████████████████   █
+█ █     █ █████████████████████████████████████████ █     █ █
+ █   █   ████████████████  ███████   ███████████████   ██  █ 
+   ██   ███████████████     ██████    ███████████████   ██   
+ ██    ██████████████████   ██████  ██████████████████    ██ 
+██ ██ ██████████████  ██ ███████████ ███  ████████████████ ██
+    ███████     ███ ██████ █     ██ ██████ ██     ███████    
+   ███████     █████ ████ █        █ ███  ████      ██████   
+     ████      █████████             ██████████     ████     
+     ████     ███████                    ██████     ████     
+      ███     █████  █     ████████     █ ██████    ████     
+     █████    █████       █████████  █     █████   █████     
+     ██████   █████        ████████       ███ █   ██████     
+     ██ █████  ██████         █          █████  █████ ██     
+       ████████  █████ ██  ██   ██  ███ ████  ████████       
+           ████████                        ███████           
+               █████████             █████████               
+                    █████████    ████████                    
+"""
+
+
+def print_banner() -> None:
+    console.print(BANNER, style="red", markup=False, highlight=False)
+
+
 # --------------------------------------------------------------------------- #
 # Environment
 # --------------------------------------------------------------------------- #
@@ -349,13 +388,6 @@ class Tool:
 TOOLS: list[Tool] = [
     Tool("vimrc", "~/.vimrc config", ["linux", "darwin"], install_vimrc, default=False),
     Tool(
-        "linenum",
-        "LinEnum enum script (git clone)",
-        ["linux"],
-        install_linenum,
-        default=False,
-    ),
-    Tool(
         "ripgrep",
         "ripgrep via apt (needs root)",
         ["linux"],
@@ -365,18 +397,13 @@ TOOLS: list[Tool] = [
         needs_root=True,
     ),
     Tool(
-        "dummy_1",
-        "Dummy Installation 1",
-        ["linux", "darwin"],
-        install_dummy1,
+        "mythic-c2",
+        "Mythic C2 toolchain via docker-compose",
+        ["linux"],
+        install_mythic_c2,
         default=False,
-    ),
-    Tool(
-        "dummy_2",
-        "Dummy Installation 2",
-        ["linux", "darwin"],
-        install_dummy2,
-        default=True,
+        supported_distros=["debian", "ubuntu", "kali"],  # e.g. ["kali"] to restrict
+        needs_root=True,
     ),
 ]
 
@@ -541,6 +568,8 @@ def main(
     distro = detect_distro()
     available = tools_for_host()
 
+    print_banner()
+
     if list_:
         table = Table(title=f"dropkit tools ({os_name}/{arch}, {distro})")
         table.add_column("Tool", style="bold cyan")
@@ -587,6 +616,8 @@ def main(
             border_style="yellow" if dry_run else "blue",
         )
     )
+
+    console.print("Dropping in cute red pandas ...")
 
     if dry_run:
         console.print(
