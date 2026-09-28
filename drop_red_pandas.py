@@ -227,27 +227,58 @@ def has_compose_plugin() -> bool:
         return False
 
 
-def docker_ready() -> bool:
+def _docker_cmd(args: list[str], sudo: bool) -> list[str]:
+    prefix = sudo_prefix() if sudo else []
+    return prefix + ["docker", *args]
+
+
+def has_docker() -> bool:
+    return shutil.which("docker") is not None
+
+
+def has_compose_plugin(sudo: bool = False) -> bool:
+    """True if the Docker Compose v2 plugin (`docker compose`) is available."""
+    if not has_docker():
+        return False
     try:
-        subprocess.run(["docker", "info"], check=True, capture_output=True, text=True)
+        subprocess.run(
+            _docker_cmd(["compose", "version"], sudo),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
 
-def wait_for_docker(timeout: float = 30.0, interval: float = 1.0, report=None) -> bool:
+def docker_ready(sudo: bool = False) -> bool:
+    try:
+        subprocess.run(
+            _docker_cmd(["info"], sudo),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def wait_for_docker(
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    sudo: bool = False,
+    report: Optional[Callable[[str], None]] = None,
+) -> bool:
     """Poll until the docker daemon responds, or timeout seconds elapse."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        try:
-            subprocess.run(
-                ["docker", "info"], check=True, capture_output=True, text=True
-            )
+        if docker_ready(sudo=sudo):
             return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            if report:
-                report("waiting for docker daemon...")
-            time.sleep(interval)
+        if report:
+            report("waiting for docker daemon...")
+        time.sleep(interval)
     return False
 
 
