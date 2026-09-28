@@ -278,6 +278,73 @@ def wait_for_docker(
     return False
 
 
+ALIAS_MARKER_START = "# >>> dropkit aliases >>>"
+ALIAS_MARKER_END = "# <<< dropkit aliases <<<"
+
+
+def _shell_rc_files() -> list[Path]:
+    """rc files to update, in priority order. Only returns ones that exist
+    or whose parent shell is plausibly in use (bash always gets one)."""
+    candidates = [HOME / ".bashrc", HOME / ".zshrc"]
+    return [p for p in candidates if p.exists()] or [HOME / ".bashrc"]
+
+
+def add_alias(
+    name: str, command: str, report: Optional[Callable[[str], None]] = None
+) -> None:
+    """Add one alias to a managed block in each shell rc file. Idempotent --
+    re-running updates the value instead of duplicating the line.
+    """
+    line = f"alias {name}={command!r}"
+    for rc in _shell_rc_files():
+        text = rc.read_text() if rc.exists() else ""
+        if ALIAS_MARKER_START not in text:
+            block = f"\n{ALIAS_MARKER_START}\n{ALIAS_MARKER_END}\n"
+            text += block
+
+        start = text.index(ALIAS_MARKER_START)
+        end = text.index(ALIAS_MARKER_END)
+        block_lines = text[start:end].splitlines()
+
+        # drop any existing alias with this name, then append the new one
+        block_lines = [l for l in block_lines if not l.startswith(f"alias {name}=")]
+        block_lines.append(line)
+
+        new_block = "\n".join(block_lines) + "\n"
+        text = text[:start] + new_block + text[end:]
+        rc.write_text(text)
+        if report:
+            report(f"alias {name} -> {rc.name}")
+
+
+def add_aliases(
+    aliases: dict[str, str], report: Optional[Callable[[str], None]] = None
+) -> None:
+    """Bulk version -- {name: command}."""
+    for name, command in aliases.items():
+        add_alias(name, command, report)
+
+
+def remove_all_aliases(report: Optional[Callable[[str], None]] = None) -> None:
+    """Strip the whole managed block from every rc file (clean uninstall)."""
+    for rc in _shell_rc_files():
+        if not rc.exists():
+            continue
+        text = rc.read_text()
+        if ALIAS_MARKER_START not in text:
+            continue
+        start = text.index(ALIAS_MARKER_START)
+        end = text.index(ALIAS_MARKER_END) + len(ALIAS_MARKER_END)
+        text = (
+            text[:start] + text[end + 1 :]
+            if text[end : end + 1] == "\n"
+            else text[:start] + text[end:]
+        )
+        rc.write_text(text)
+        if report:
+            report(f"removed alias block from {rc.name}")
+
+
 # --------------------------------------------------------------------------- #
 # Installers
 # --------------------------------------------------------------------------- #
@@ -346,6 +413,16 @@ def install_ripgrep(report: Callable[[str], None]) -> None:
     report("done")
 
 
+def install_mythic_aliases(mythic_dir: Path, report: Callable[[str], None]) -> None:
+    add_aliases(
+        {
+            "mythic-cli": f"sudo {str(mythic_dir / 'mythic-cli')}",
+        },
+        report,
+    )
+    report("done -- run `source ~/.bashrc` or open a new shell")
+
+
 def install_mythic_c2(report: Callable[[str], None]) -> None:
     """
     Install Mythic C2 and if necessary also docker.
@@ -392,6 +469,7 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
         raise RuntimeError("docker daemon did not become ready in time")
 
     sh(["make"], report, sudo=True, cwd=workdir)
+    install_mythic_aliases(mythic_dir=workdir, report=report)
     report("done")
 
 
