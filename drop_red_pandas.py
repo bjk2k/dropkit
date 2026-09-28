@@ -226,6 +226,14 @@ def has_compose_plugin() -> bool:
         return False
 
 
+def docker_ready() -> bool:
+    try:
+        subprocess.run(["docker", "info"], check=True, capture_output=True, text=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
 # --------------------------------------------------------------------------- #
 # Installers
 # --------------------------------------------------------------------------- #
@@ -335,6 +343,7 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
             raise ValueError(f"No procedure to install docker for distro {distro}")
         report("docker and docker-compose-plugin installed")
 
+    assert docker_ready(), "Docker daemon not ready!"
     sh(["make"], report, sudo=True, cwd=workdir)
     report("done")
 
