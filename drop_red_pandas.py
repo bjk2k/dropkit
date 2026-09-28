@@ -471,28 +471,6 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
     sh(["make"], report, sudo=True, cwd=workdir)
     install_mythic_aliases(mythic_dir=workdir, report=report)
     sh(["./mythic-cli"], report, sudo=True, cwd=workdir)
-    sh(
-        [
-            "./mythic-cli",
-            "install",
-            "github",
-            "https://github.com/MythicAgents/Apollo.git",
-        ],
-        report,
-        sudo=True,
-        cwd=workdir,
-    )
-    sh(
-        [
-            "./mythic-cli",
-            "install",
-            "github",
-            "https://github.com/MythicAgents/poseidon.git",
-        ],
-        report,
-        sudo=True,
-        cwd=workdir,
-    )
 
     report("done")
 
