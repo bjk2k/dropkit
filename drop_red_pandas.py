@@ -241,12 +241,10 @@ def has_compose_plugin(sudo: bool = False) -> bool:
     if not has_docker():
         return False
     try:
-        subprocess.run(
-            _docker_cmd(["compose", "version"], sudo),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        if sudo:
+            sh(["sudo", "docker", "compose", "version"], sudo=True)
+        else:
+            sh(["docker", "compose", "version"], sudo=False)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -254,12 +252,10 @@ def has_compose_plugin(sudo: bool = False) -> bool:
 
 def docker_ready(sudo: bool = False) -> bool:
     try:
-        subprocess.run(
-            _docker_cmd(["info"], sudo),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        if sudo:
+            sh(["sudo", "docker", "info"], sudo=True)
+        else:
+            sh(["docker", "info"], sudo=False)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
