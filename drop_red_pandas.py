@@ -483,6 +483,8 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
         "https://github.com/MythicAgents/forge",
         "https://github.com/MythicAgents/poseidon",
         "https://github.com/MythicC2Profiles/http",
+        "https://github.com/MythicC2Profiles/httpx",
+        "https://github.com/MythicC2Profiles/tcp",
         "https://github.com/MythicC2Profiles/smb",
     ]
     for service_url in services:
