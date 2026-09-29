@@ -816,10 +816,8 @@ def main(
     table = Table(title="important variables")
     table.add_column("Key")
     table.add_column("Value")
-    for a in important_values_after_install.values():
-        console.print("a")
-        console.print(a)
-        table.add_row(*a)
+    for a, b in important_values_after_install.items():
+        table.add_row(a, b)
 
     console.print(table)
 
