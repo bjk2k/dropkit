@@ -14,6 +14,7 @@ Run non-interactively with --tools, or interactively with no args.
 # dependencies = [
 #     "typer>=0.12.0",
 #     "rich>=13.0.0",
+#     "dotenv>=0.9.9",
 # ]
 # ///
 
@@ -32,6 +33,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Callable, Optional
+from dotenv import dotenv_values
 
 import typer
 from rich.console import Console
@@ -74,6 +76,9 @@ BANNER = r"""
                █████████             █████████               
                     █████████    ████████                    
 """
+
+
+important_values_after_install: dict[str, str | None] = {}
 
 
 def print_banner() -> None:
@@ -471,6 +476,28 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
     sh(["make"], report, sudo=True, cwd=workdir)
     install_mythic_aliases(mythic_dir=workdir, report=report)
     sh(["./mythic-cli"], report, sudo=True, cwd=workdir)
+    services = [
+        "https://github.com/MythicAgents/apollo",
+        "https://github.com/MythicC2Profiles/http",
+        "https://github.com/MythicC2Profiles/smb",
+    ]
+    for service_url in services:
+        sh(
+            ["./mythic-cli", "install", "github", service_url],
+            report,
+            sudo=True,
+            cwd=workdir,
+        )
+
+    mythic_env_file = workdir / ".env"
+    config = dotenv_values(str(mythic_env_file.absolute()))
+    global important_values_after_install
+
+    important_values_after_install["mythic-user"] = config["MYTHIC_ADMIN_USER"]
+    important_values_after_install["mythic-admin"] = config["MYTHIC_ADMIN_PASSWORD"]
+    important_values_after_install["mythic-url"] = (
+        f"https://localhost:{config['MYTHIC_SERVER_PORT']}"
+    )
 
     report("done")
 
@@ -782,6 +809,16 @@ def main(
     failed = [n for n, e in results.items() if e is not None]
     console.print()
     console.print(f"[green]installed:[/green] {', '.join(ok) or '-'}")
+
+    global important_values_after_install
+    table = Table(title="important variables")
+    table.add_column("Key")
+    table.add_column("Value")
+    for k, v in important_values_after_install.keys():
+        table.add_row(k, v)
+
+    console.print(table)
+
     if failed:
         console.print(f"[red]failed:[/red] {', '.join(failed)}")
         raise typer.Exit(code=1)
