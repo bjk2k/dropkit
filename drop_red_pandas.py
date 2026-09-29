@@ -498,7 +498,7 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
         config["MYTHIC_ADMIN_PASSWORD"] or "NaN"
     )
     important_values_after_install["mythic-url"] = (
-        f"https://127.0.0.1:{config['MYTHIC_NGINX_PORT']}"
+        f"https://127.0.0.1:{config['NGINX_PORT']}"
     )
 
     report("done")
