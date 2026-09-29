@@ -814,7 +814,7 @@ def main(
     table = Table(title="important variables")
     table.add_column("Key")
     table.add_column("Value")
-    for k, v in important_values_after_install.keys():
+    for k, v in important_values_after_install.values():
         table.add_row(k, v)
 
     console.print(table)
