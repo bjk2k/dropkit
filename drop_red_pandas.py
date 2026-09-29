@@ -478,6 +478,10 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
     sh(["./mythic-cli"], report, sudo=True, cwd=workdir)
     services = [
         "https://github.com/MythicAgents/apollo",
+        "https://github.com/MythicAgents/apfell",
+        "https://github.com/MythicAgents/woopsie",
+        "https://github.com/MythicAgents/forge",
+        "https://github.com/MythicAgents/poseidon",
         "https://github.com/MythicC2Profiles/http",
         "https://github.com/MythicC2Profiles/smb",
     ]
