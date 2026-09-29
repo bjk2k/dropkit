@@ -78,7 +78,7 @@ BANNER = r"""
 """
 
 
-important_values_after_install: dict[str, str | None] = {}
+important_values_after_install: dict[str, str] = {}
 
 
 def print_banner() -> None:
@@ -493,8 +493,10 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
     config = dotenv_values(str(mythic_env_file.absolute()))
     global important_values_after_install
 
-    important_values_after_install["mythic-user"] = config["MYTHIC_ADMIN_USER"]
-    important_values_after_install["mythic-admin"] = config["MYTHIC_ADMIN_PASSWORD"]
+    important_values_after_install["mythic-user"] = config["MYTHIC_ADMIN_USER"] or "NaN"
+    important_values_after_install["mythic-admin"] = (
+        config["MYTHIC_ADMIN_PASSWORD"] or "NaN"
+    )
     important_values_after_install["mythic-url"] = (
         f"https://localhost:{config['MYTHIC_SERVER_PORT']}"
     )
