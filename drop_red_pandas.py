@@ -420,7 +420,7 @@ def install_ripgrep(report: Callable[[str], None]) -> None:
 
 def install_default_cred_cheatsheet(report: Callable[[str], None]) -> None:
     report("installing default-credentials-cheat-sheet")
-    sh(["pipx", "install", "deaultcreds-cheat-sheet"], report, sudo=True)
+    sh(["pipx", "install", "deaultcreds-cheat-sheet"], report)
     report("done")
 
 
@@ -587,7 +587,7 @@ TOOLS: list[Tool] = [
         install_default_cred_cheatsheet,
         default=True,
         supported_distros=["debian", "ubuntu", "kali"],
-        needs_root=True,
+        needs_root=False,
     ),
 ]
 
