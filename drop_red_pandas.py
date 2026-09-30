@@ -418,6 +418,12 @@ def install_ripgrep(report: Callable[[str], None]) -> None:
     report("done")
 
 
+def install_default_cred_cheatsheet(report: Callable[[str], None]) -> None:
+    report("installing default-credentials-cheat-sheet")
+    sh(["pipx", "install", "deaultcreds-cheat-sheet"], report, sudo=True)
+    report("done")
+
+
 def install_mythic_aliases(mythic_dir: Path, report: Callable[[str], None]) -> None:
     add_aliases(
         {
@@ -572,6 +578,15 @@ TOOLS: list[Tool] = [
         install_mythic_c2,
         default=False,
         supported_distros=["debian", "ubuntu", "kali"],  # e.g. ["kali"] to restrict
+        needs_root=True,
+    ),
+    Tool(
+        "defaultcreds-cheat-sheet",
+        "Defaul credential cheat sheet (as a pipx package)",
+        ["linux"],
+        install_default_cred_cheatsheet,
+        default=True,
+        supported_distros=["debian", "ubuntu", "kali"],
         needs_root=True,
     ),
 ]
