@@ -434,10 +434,7 @@ def install_mythic_aliases(mythic_dir: Path, report: Callable[[str], None]) -> N
     report("done -- run `source ~/.bashrc` or open a new shell")
 
 
-def install_mythic_c2(report: Callable[[str], None]) -> None:
-    """
-    Install Mythic C2 and if necessary also docker.
-    """
+def install_mythic_base(report: Callable[[str], None]) -> None:
     dest = HOME / ".local" / "share" / "MythicC2"
     if dest.exists():
         report("updating repo")
@@ -482,6 +479,26 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
     sh(["make"], report, sudo=True, cwd=workdir)
     install_mythic_aliases(mythic_dir=workdir, report=report)
     sh(["./mythic-cli"], report, sudo=True, cwd=workdir)
+
+    mythic_env_file = workdir / ".env"
+    config = dotenv_values(str(mythic_env_file.absolute()))
+    global important_values_after_install
+
+    important_values_after_install["mythic-user"] = config["MYTHIC_ADMIN_USER"] or "NaN"
+    important_values_after_install["mythic-admin"] = (
+        config["MYTHIC_ADMIN_PASSWORD"] or "NaN"
+    )
+    important_values_after_install["mythic-url"] = (
+        f"https://127.0.0.1:{config['NGINX_PORT']}"
+    )
+
+
+def install_mythic_c2_complete(report: Callable[[str], None]) -> None:
+    """
+    Install Mythic C2 and if necessary also docker.
+    """
+    workdir = HOME / ".local" / "share" / "MythicC2"
+    install_mythic_base(report)
     services = [
         "https://github.com/MythicAgents/apollo",
         "https://github.com/MythicAgents/forge",
@@ -498,19 +515,54 @@ def install_mythic_c2(report: Callable[[str], None]) -> None:
             sudo=True,
             cwd=workdir,
         )
+    report("done")
 
-    mythic_env_file = workdir / ".env"
-    config = dotenv_values(str(mythic_env_file.absolute()))
-    global important_values_after_install
 
-    important_values_after_install["mythic-user"] = config["MYTHIC_ADMIN_USER"] or "NaN"
-    important_values_after_install["mythic-admin"] = (
-        config["MYTHIC_ADMIN_PASSWORD"] or "NaN"
-    )
-    important_values_after_install["mythic-url"] = (
-        f"https://127.0.0.1:{config['NGINX_PORT']}"
-    )
+def install_mythic_c2_minimal_win(report: Callable[[str], None]) -> None:
+    """
+    Install Mythic C2 and if necessary also docker.
+    """
+    workdir = HOME / ".local" / "share" / "MythicC2"
+    install_mythic_base(report)
+    services = [
+        "https://github.com/MythicAgents/apollo",
+        "https://github.com/MythicAgents/forge",
+        "https://github.com/MythicC2Profiles/http",
+        "https://github.com/MythicC2Profiles/httpx",
+        "https://github.com/MythicC2Profiles/tcp",
+        "https://github.com/MythicC2Profiles/smb",
+    ]
+    for service_url in services:
+        sh(
+            ["./mythic-cli", "install", "github", service_url],
+            report,
+            sudo=True,
+            cwd=workdir,
+        )
+    report("done")
 
+
+def install_mythic_c2_minimal_linux(report: Callable[[str], None]) -> None:
+    """
+    Install Mythic C2 and if necessary also docker.
+    """
+    workdir = HOME / ".local" / "share" / "MythicC2"
+    install_mythic_base(report)
+    services = [
+        "https://github.com/MythicAgents/poseidon",
+        "https://github.com/MythicAgents/forge",
+        "https://github.com/MythicC2Profiles/http",
+        "https://github.com/MythicC2Profiles/httpx",
+        "https://github.com/MythicC2Profiles/tcp",
+        "https://github.com/MythicC2Profiles/smb",
+    ]
+    for service_url in services:
+        sh(
+            ["./mythic-cli", "install", "github", service_url],
+            report,
+            sudo=True,
+            cwd=workdir,
+        )
     report("done")
 
 
@@ -572,10 +624,28 @@ TOOLS: list[Tool] = [
         needs_root=True,
     ),
     Tool(
-        "mythic-c2",
-        "Mythic C2 toolchain via docker-compose",
+        "mythic-c2 (complete)",
+        "Mythic C2 toolchain via docker-compose with win + linux support.",
         ["linux"],
-        install_mythic_c2,
+        install_mythic_c2_complete,
+        default=False,
+        supported_distros=["debian", "ubuntu", "kali"],  # e.g. ["kali"] to restrict
+        needs_root=True,
+    ),
+    Tool(
+        "mythic-c2 (linux)",
+        "Mythic C2 toolchain via docker-compose with linux support.",
+        ["linux"],
+        install_mythic_c2_minimal_linux,
+        default=False,
+        supported_distros=["debian", "ubuntu", "kali"],  # e.g. ["kali"] to restrict
+        needs_root=True,
+    ),
+    Tool(
+        "mythic-c2 (win)",
+        "Mythic C2 toolchain via docker-compose with windows support.",
+        ["linux"],
+        install_mythic_c2_minimal_linux,
         default=False,
         supported_distros=["debian", "ubuntu", "kali"],  # e.g. ["kali"] to restrict
         needs_root=True,
