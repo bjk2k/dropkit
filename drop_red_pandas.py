@@ -420,7 +420,13 @@ def install_ripgrep(report: Callable[[str], None]) -> None:
 
 def install_default_cred_cheatsheet(report: Callable[[str], None]) -> None:
     report("installing default-credentials-cheat-sheet")
-    sh(["pipx", "install", "deaultcreds-cheat-sheet"], report)
+    sh(["pipx", "install", "defaultcreds-cheat-sheet"], report)
+    report("done")
+
+
+def install_tldr(report: Callable[[str], None]) -> None:
+    report("installing default-credentials-cheat-sheet")
+    sh(["pipx", "install", "defaultcreds-cheat-sheet"], report)
     report("done")
 
 
@@ -435,7 +441,7 @@ def install_mythic_aliases(mythic_dir: Path, report: Callable[[str], None]) -> N
 
 
 def install_mythic_base(report: Callable[[str], None]) -> None:
-    dest = HOME / ".local" / "share" / "MythicC2"
+    dest = HOME / "mythic"
     if dest.exists():
         report("updating repo")
         sh(["git", "-C", str(dest), "pull", "--ff-only"], report)
@@ -478,7 +484,7 @@ def install_mythic_base(report: Callable[[str], None]) -> None:
 
     sh(["make"], report, sudo=True, cwd=workdir)
     install_mythic_aliases(mythic_dir=workdir, report=report)
-    sh(["./mythic-cli"], report, sudo=True, cwd=workdir)
+    sh(["./mythic-cli", "start"], report, sudo=True, cwd=workdir)
 
     mythic_env_file = workdir / ".env"
     config = dotenv_values(str(mythic_env_file.absolute()))
@@ -497,7 +503,7 @@ def install_mythic_c2_complete(report: Callable[[str], None]) -> None:
     """
     Install Mythic C2 and if necessary also docker.
     """
-    workdir = HOME / ".local" / "share" / "MythicC2"
+    workdir = HOME / "mythic"
     install_mythic_base(report)
     services = [
         "https://github.com/MythicAgents/apollo",
@@ -522,7 +528,7 @@ def install_mythic_c2_minimal_win(report: Callable[[str], None]) -> None:
     """
     Install Mythic C2 and if necessary also docker.
     """
-    workdir = HOME / ".local" / "share" / "MythicC2"
+    workdir = HOME / "mythic"
     install_mythic_base(report)
     services = [
         "https://github.com/MythicAgents/apollo",
@@ -651,12 +657,28 @@ TOOLS: list[Tool] = [
         needs_root=True,
     ),
     Tool(
+        "mythic-c2 (win)",
+        "Mythic C2 toolchain via docker-compose with no additional services.",
+        ["linux"],
+        install_mythic_base,
+        default=False,
+        supported_distros=["debian", "ubuntu", "kali"],  # e.g. ["kali"] to restrict
+        needs_root=True,
+    ),
+    Tool(
         "defaultcreds-cheat-sheet",
         "Defaul credential cheat sheet (as a pipx package)",
-        ["linux"],
+        ["linux", "darwin"],
         install_default_cred_cheatsheet,
         default=True,
-        supported_distros=["debian", "ubuntu", "kali"],
+        needs_root=False,
+    ),
+    Tool(
+        "tldr",
+        "Man page aggregator for quick documentation",
+        ["linux", "darwin"],
+        install_tldr,
+        default=True,
         needs_root=False,
     ),
 ]
