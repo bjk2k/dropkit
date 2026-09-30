@@ -657,7 +657,7 @@ TOOLS: list[Tool] = [
         needs_root=True,
     ),
     Tool(
-        "mythic-c2 (win)",
+        "mythic-c2 (minimal)",
         "Mythic C2 toolchain via docker-compose with no additional services.",
         ["linux"],
         install_mythic_base,
