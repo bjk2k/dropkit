@@ -426,7 +426,7 @@ def install_default_cred_cheatsheet(report: Callable[[str], None]) -> None:
 
 def install_tldr(report: Callable[[str], None]) -> None:
     report("installing default-credentials-cheat-sheet")
-    sh(["pipx", "install", "defaultcreds-cheat-sheet"], report)
+    sh(["pipx", "install", "tldr"], report)
     report("done")
 
 
