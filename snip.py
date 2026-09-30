@@ -14,6 +14,8 @@ import sys
 import tomllib
 from difflib import get_close_matches
 from typing import Annotated
+import tempfile
+from pathlib import Path
 
 from cyclopts import App, Parameter
 from rich.console import Console
@@ -84,24 +86,29 @@ def candidates(query: str) -> list[str]:
 
 def pick(names: list[str]) -> str:
     if shutil.which("fzf") and sys.stdin.isatty():
-        lines = "\n".join(f"{n}\t{DB[n].get('description', '')}" for n in names)
-        preview = shlex.join([sys.executable, __file__]) + " {1} --raw"
-        r = subprocess.run(
-            [
-                "fzf",
-                "--delimiter=\t",
-                "--with-nth=1,2",
-                "--preview",
-                preview,
-                "--preview-window=right,60%",
-            ],
-            input=lines,
-            text=True,
-            stdout=subprocess.PIPE,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            # index-based filenames, so odd characters in snippet names are safe
+            for i, n in enumerate(names):
+                (Path(tmp) / str(i)).write_text(DB[n]["body"])
+            lines = "\n".join(
+                f"{i}\t{n}\t{DB[n].get('description', '')}" for i, n in enumerate(names)
+            )
+            r = subprocess.run(
+                [
+                    "fzf",
+                    "--delimiter=\t",
+                    "--with-nth=2,3",
+                    "--preview",
+                    f"cat {shlex.quote(tmp)}/{{1}}",
+                    "--preview-window=right,60%",
+                ],
+                input=lines,
+                text=True,
+                stdout=subprocess.PIPE,
+            )
         if r.returncode != 0:
             raise SystemExit(1)
-        return r.stdout.split("\t")[0]
+        return r.stdout.split("\t")[1]
     for i, n in enumerate(names, 1):
         err.print(
             f"[cyan]{i:>2}[/] [bold]{n}[/]  [dim]{DB[n].get('description', '')}[/]"
