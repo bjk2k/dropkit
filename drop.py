@@ -581,6 +581,11 @@ def install_vimrc(report: Callable[[str], None]) -> None:
     report("done")
 
 
+def install_fzf(report: Callable[[str], None]) -> None:
+    report("installing fzf")
+    sh(["apt", "install", "fzf"], report, sudo=True)
+
+
 def install_dummy1(report: Callable[[str], None]) -> None:
     report("Installing Dummy [1]")
     report("done")
@@ -678,6 +683,14 @@ TOOLS: list[Tool] = [
         "Man page aggregator for quick documentation",
         ["linux", "darwin"],
         install_tldr,
+        default=True,
+        needs_root=False,
+    ),
+    Tool(
+        "fzf",
+        "Fuzzy Finder",
+        ["linux"],
+        install_fzf,
         default=True,
         needs_root=False,
     ),
