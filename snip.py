@@ -637,6 +637,13 @@ Get-DomainObjectAcl -SearchBase "CN=Policies,CN=System,{{base_dn}}" -ResolveGUID
 '''
 
 # ══ MYTHIC C2 ══════════════════════════════════════════════════════════
+[mythic-erebus-installation]
+lang = "text"
+tags = ["mythic", "c2", "erebus"]
+body = '''
+mythic-cli install github https://github.com/Whispergate/Erebus
+'''
+
 [mythic-apollo-ref]
 description = "Mythic Apollo: task command quick-reference"
 lang = "text"
