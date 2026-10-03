@@ -586,6 +586,25 @@ def install_fzf(report: Callable[[str], None]) -> None:
     sh(["apt", "install", "fzf"], report, sudo=True)
 
 
+def install_snip(report: Callable[[str], None]) -> None:
+    report("installing snip.py")
+    # # download
+    # curl -fsSL https://raw.githubusercontent.com/.../snip.py -o ~/.local/bin/snip
+    # chmod +x ~/.local/bin/snip
+    sh(
+        [
+            "curl",
+            "-fsSL",
+            "https://raw.githubusercontent.com/dropkit/refs/heads/main/snip.py",
+            "-o",
+            "~/.local/bin/snip",
+        ],
+        report,
+    )
+    sh(["chmod", "+x", "~/.local/bin/snip"], report)
+    report("done")
+
+
 def install_dummy1(report: Callable[[str], None]) -> None:
     report("Installing Dummy [1]")
     report("done")
@@ -694,6 +713,14 @@ TOOLS: list[Tool] = [
         default=True,
         needs_root=False,
     ),
+    Tool(
+        "snip",
+        "Homebuilt snippet manager",
+        ["linux"]
+        install_snip,
+        default=True,
+        needs_root=False
+    )
 ]
 
 
