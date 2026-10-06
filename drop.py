@@ -716,11 +716,11 @@ TOOLS: list[Tool] = [
     Tool(
         "snip",
         "Homebuilt snippet manager",
-        ["linux"]
+        ["linux"],
         install_snip,
         default=True,
-        needs_root=False
-    )
+        needs_root=False,
+    ),
 ]
 
 
