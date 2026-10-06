@@ -588,22 +588,15 @@ def install_fzf(report: Callable[[str], None]) -> None:
 
 def install_snip(report: Callable[[str], None]) -> None:
     report("installing snip.py")
-    # # download
-    # curl -fsSL https://raw.githubusercontent.com/.../snip.py -o ~/.local/bin/snip
-    # chmod +x ~/.local/bin/snip
-    sh(
-        [
-            "curl",
-            "-fsSL",
-            "https://raw.githubusercontent.com/bjk2k/dropkit/refs/heads/main/snip.py",
-            "-o",
-            "~/.local/bin/snip",
-        ],
+    LOCAL_BIN.mkdir(parents=True, exist_ok=True)
+    dest = LOCAL_BIN / "snip"
+    download(
+        "https://raw.githubusercontent.com/bjk2k/dropkit/refs/heads/main/snip.py",
+        dest,
         report,
-        sudo=True,
     )
-    sh(["chmod", "+x", "~/.local/bin/snip"], report, sudo=True)
-    report("done")
+    dest.chmod(0o755)
+    report(f"-> {dest}")
 
 
 def install_dummy1(report: Callable[[str], None]) -> None:
