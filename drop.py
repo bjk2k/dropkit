@@ -600,8 +600,9 @@ def install_snip(report: Callable[[str], None]) -> None:
             "~/.local/bin/snip",
         ],
         report,
+        sudo=True,
     )
-    sh(["chmod", "+x", "~/.local/bin/snip"], report)
+    sh(["chmod", "+x", "~/.local/bin/snip"], report, sudo=True)
     report("done")
 
 
@@ -719,7 +720,7 @@ TOOLS: list[Tool] = [
         ["linux"],
         install_snip,
         default=True,
-        needs_root=False,
+        needs_root=True,
     ),
 ]
 
