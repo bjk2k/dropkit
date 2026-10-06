@@ -595,7 +595,7 @@ def install_snip(report: Callable[[str], None]) -> None:
         [
             "curl",
             "-fsSL",
-            "https://raw.githubusercontent.com/dropkit/refs/heads/main/snip.py",
+            "https://raw.githubusercontent.com/bjk2k/dropkit/refs/heads/main/snip.py",
             "-o",
             "~/.local/bin/snip",
         ],
