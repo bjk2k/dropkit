@@ -216,29 +216,9 @@ def has_docker() -> bool:
     return shutil.which("docker") is not None
 
 
-def has_compose_plugin() -> bool:
-    """True if the Docker Compose v2 plugin (`docker compose`) is available."""
-    if not has_docker():
-        return False
-    try:
-        subprocess.run(
-            ["docker", "compose", "version"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-
 def _docker_cmd(args: list[str], sudo: bool) -> list[str]:
     prefix = sudo_prefix() if sudo else []
     return prefix + ["docker", *args]
-
-
-def has_docker() -> bool:
-    return shutil.which("docker") is not None
 
 
 def has_compose_plugin(sudo: bool = False) -> bool:
@@ -247,7 +227,7 @@ def has_compose_plugin(sudo: bool = False) -> bool:
         return False
     try:
         if sudo:
-            sh(["sudo", "docker", "compose", "version"], sudo=True)
+            sh(["docker", "compose", "version"], sudo=True)
         else:
             sh(["docker", "compose", "version"], sudo=False)
         return True
