@@ -458,7 +458,9 @@ def install_mythic_base(report: Callable[[str], None]) -> None:
             raise ValueError(f"No procedure to install docker for distro {distro}")
         report("docker and docker-compose-plugin installed")
 
-    sh(["systemctl", "start", "docker"], report, sudo=True)
+    if not wait_for_docker(timeout=5, report=report, sudo=True):
+        report("trying to start docker, this fails on podman")
+        sh(["systemctl", "start", "docker"], report, sudo=True)
     if not wait_for_docker(timeout=30, report=report, sudo=True):
         raise RuntimeError("docker daemon did not become ready in time")
 
